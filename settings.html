@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>X Lens 设置</title><link rel="stylesheet" href="settings.css"></head>
+<body><main><span class="brand"><img src="icons/icon48.png" width="30" height="30" alt=""> X Lens<span> / 推文透镜</span></span><h1>少一点噪音。</h1><p>独立识别推文和详情页评论中的疑似 AI、垃圾内容和广告 / 软广。</p>
+<form id="settings"><label for="key">TypeSafe API Key</label><input id="key" type="password" autocomplete="off" placeholder="粘贴你的 API Key"><a href="https://console.typesafe.ai" target="_blank" rel="noreferrer">获取 API Key ↗</a>
+<label for="threshold">判断阈值 <output id="value">65%</output></label><input id="threshold" type="range" min="50" max="99" value="65"><small>越低越容易标记。独立判断：AI 达标显示紫色 AI；垃圾内容达标显示红色 slop；广告/软广达标显示蓝色广告。默认 65%。</small>
+<p class="notice">只检测当前可见推文和评论，不访问作者主页、不自动弹窗。标签位于 Grok 左侧，点击可在右上角查看评分。</p><label class="toggle"><input id="enabled" type="checkbox"> 启用自动检测</label><p class="notice">启用后，当前可见推文和评论正文会发送至 TypeSafe AI，可能产生 API 费用。密钥仅保存在本机。文本判断可能误判，不代表作者真实创作方式。</p><button type="submit">保存设置</button><p id="status" role="status"></p><p id="error" role="alert"></p></form>
+</main><script src="settings.js"></script></body></html>

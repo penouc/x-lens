@@ -1,0 +1,11 @@
+{
+  "name": "x-lens",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "version": "0.5.0",
+  "description": "Lightweight AI, slop and advertising labels for X.",
+  "license": "MIT"
+}
