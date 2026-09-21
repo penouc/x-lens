@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "X Lens · 推文透镜",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "使用 Jev 为当前推文和评论标记 AI、垃圾、广告、营销、软广或正常。",
   "minimum_chrome_version": "102",
   "permissions": [
