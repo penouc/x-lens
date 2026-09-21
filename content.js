@@ -61,8 +61,8 @@
       || document.hidden || !article.isConnected || !visible(article) || read(article)?.fingerprint !== tweet.fingerprint) return;
     const host=document.createElement('div');
     const root=host.attachShadow({mode:'closed'});
-    root.innerHTML='<style>:host{all:initial;position:fixed;right:18px;bottom:18px;z-index:2147483646;color:#edf2f7;font:14px/1.6 system-ui,sans-serif}.box{box-sizing:border-box;width:min(340px,calc(100vw - 36px));padding:18px;border:1px solid #435149;border-radius:12px;background:#17212b;box-shadow:0 10px 40px #0005}strong{color:#c6f586}p{margin:9px 0}.note{color:#aab4bf;font-size:12px}button{border:0;border-radius:7px;padding:9px 12px;margin-right:6px;background:#c6f586;color:#17212b;cursor:pointer;font-weight:600}.dismiss{background:#303b46;color:white}.status{color:#ffad99}</style><section class="box" role="dialog" aria-label="X Lens 屏蔽提示"><strong>X Lens · slop</strong><p class="message"></p><p class="note">模型可能误判。点击后仍需在 X 的确认窗口完成屏蔽。可在插件设置中关闭自动提示。</p><button class="block">屏蔽账号…</button><button class="dismiss">暂不屏蔽</button><p class="status" role="status"></p></section>';
-    root.querySelector('.message').textContent='@'+tweet.handle+' 的当前内容疑似 slop（'+Math.round(result.junk*100)+'%）。是否屏蔽这个账号？';
+    root.innerHTML='<style>:host{all:initial;position:fixed;right:18px;bottom:18px;z-index:2147483646;color:#edf2f7;font:14px/1.6 system-ui,sans-serif}.box{box-sizing:border-box;width:min(340px,calc(100vw - 36px));padding:18px;border:1px solid #435149;border-radius:12px;background:#17212b;box-shadow:0 10px 40px #0005}strong{color:#c6f586}p{margin:9px 0}.note{color:#aab4bf;font-size:12px}button{border:0;border-radius:7px;padding:9px 12px;margin-right:6px;background:#c6f586;color:#17212b;cursor:pointer;font-weight:600}.dismiss{background:#303b46;color:white}.status{color:#ffad99}</style><section class="box" role="dialog" aria-label="X Lens 屏蔽提示"><strong>X Lens · slop / 垃圾</strong><p class="message"></p><p class="note">模型可能误判。点击后仍需在 X 的确认窗口完成屏蔽。可在插件设置中关闭自动提示。</p><button class="block">屏蔽账号…</button><button class="dismiss">暂不屏蔽</button><p class="status" role="status"></p></section>';
+    root.querySelector('.message').textContent='@'+tweet.handle+' 的当前内容疑似 slop / 垃圾（'+Math.round(result.junk*100)+'%）。是否屏蔽这个账号？';
     root.querySelector('.dismiss').onclick=closePrompt;
     root.querySelector('.block').onclick=async()=>{
       root.querySelector('.block').disabled=true;
@@ -93,7 +93,7 @@
     const existing = article.querySelector('.slope-badge');
     if (existing) { placeBadge(article, existing); return; }
     const badge = document.createElement('button'); badge.className = 'slope-badge'; badge.type = 'button';
-    for (const [show, text, className] of [[result.isAI, 'AI', 'slop-ai'], [result.isSlop, 'slop', 'slop-junk'], [result.isAd, '广告', 'slop-ad']]) {
+    for (const [show, text, className] of [[result.isAI, 'AI', 'slop-ai'], [result.isSlop, 'slop / 垃圾', 'slop-junk'], [result.isAd, 'Ad / 广告', 'slop-ad']]) {
       if (!show) continue;
       const label = document.createElement('span'); label.className = className; label.textContent = text; badge.append(label);
     }
@@ -143,7 +143,7 @@
         states.set(article, {fingerprint:tweet.fingerprint, result, retryAt:result?.error || result?.skip ? Date.now()+60000 : Infinity});
         if (result.error || result.skip) { report(result.error || result.reason); break; }
         checked++; if (result.flagged) hits++; if (result.isAI) aiHits++; if (result.isSlop) slopHits++; if (result.isAd) adHits++;
-        report('已检查推文/评论 ' + checked + ' 条 · AI ' + aiHits + ' / slop ' + slopHits + ' / 广告 ' + adHits + ' · 最近 AI ' + Math.round(result.ai*100) + '% / 垃圾 ' + Math.round(result.junk*100) + '%');
+        report('已检查推文/评论 ' + checked + ' 条 · AI ' + aiHits + ' / slop·垃圾 ' + slopHits + ' / Ad·广告 ' + adHits + ' · 最近 AI ' + Math.round(result.ai*100) + '% / 垃圾 ' + Math.round(result.junk*100) + '%');
         if (result?.flagged) { mark(article, tweet, result); maybePrompt(article, tweet, result, config); }
       }
       if (articles.length && !readable) {
