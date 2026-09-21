@@ -2,7 +2,7 @@ article.slope-marked{position:relative!important}
 .slope-badge{position:absolute!important;top:10px!important;right:46px!important;z-index:2!important;border:1px solid #98b866!important;border-radius:5px!important;background:#e2f5c7!important;color:#29401e!important;padding:2px 7px!important;font:700 12px/18px system-ui,sans-serif!important;cursor:pointer!important;box-shadow:0 1px 4px #0002!important}
 .slope-badge:focus-visible{outline:2px solid #1d9bf0!important;outline-offset:3px!important}
 
-.slope-monitor{position:fixed!important;top:12px!important;right:12px!important;z-index:2147483645!important;max-width:min(480px,calc(100vw - 24px))!important;padding:8px 12px!important;border:1px solid #526143!important;border-radius:9px!important;background:#17212bf2!important;color:#d6edbd!important;font:12px/1.5 system-ui,sans-serif!important;pointer-events:none!important;box-shadow:0 2px 12px #0003!important}
+.slope-monitor{position:fixed!important;top:76px!important;right:12px!important;z-index:2147483645!important;max-width:min(480px,calc(100vw - 24px))!important;padding:8px 12px!important;border:1px solid #526143!important;border-radius:9px!important;background:#17212bf2!important;color:#d6edbd!important;font:12px/1.5 system-ui,sans-serif!important;pointer-events:none!important;box-shadow:0 2px 12px #0003!important}
 
 .slope-badge-anchored{right:auto!important;transform:translate(-100%,-50%)!important;white-space:nowrap!important}
 
