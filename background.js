@@ -38,7 +38,7 @@ chrome.storage.onChanged.addListener((changes) => {
 });
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (message?.type === 'config') {
-    ready.then(() => chrome.storage.local.get(['apiKey','enabled'])).then(data => reply({configured:!!data.apiKey, enabled:!!data.enabled})).catch(error => reply({error:error.message}));
+    ready.then(() => chrome.storage.local.get(['apiKey','enabled','autoBlockPrompt'])).then(data => reply({configured:!!data.apiKey, enabled:!!data.enabled, autoBlockPrompt:data.autoBlockPrompt === true})).catch(error => reply({error:error.message}));
     return true;
   }
   if (message?.type === 'testConnection' && !sender.tab && sender.url?.startsWith(chrome.runtime.getURL(''))) {

@@ -1,5 +1,7 @@
 (() => {
   let states = new WeakMap(), generation = 0, running = false;
+  let activePrompt = null, lastPromptAt = -Infinity;
+  const promptedAccounts = new Set();
   let checked = 0, hits = 0, aiHits = 0, slopHits = 0, adHits = 0;
   const monitor = document.createElement('div');
   monitor.className = 'slope-monitor'; monitor.setAttribute('role', 'status');
@@ -26,6 +28,52 @@
     return {handle: match[1], id: match[2], text, fingerprint: match[2] + ':' + text};
   }
   function visible(el) { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }
+  function canPrompt(config, result, alreadyPrompted, busy, now, lastPrompt) {
+    return config?.enabled === true && config?.autoBlockPrompt === true && result?.isSlop === true
+      && !alreadyPrompted && !busy && now - lastPrompt >= 30000;
+  }
+  function closePrompt() { activePrompt?.remove(); activePrompt = null; }
+  async function openBlockConfirmation(article, tweet, host) {
+    if (!host.isConnected || !article.isConnected || read(article)?.fingerprint !== tweet.fingerprint) throw new Error('推文已离开页面，请重新找到该推文后操作。');
+    if (document.querySelector('[role="menu"]')) throw new Error('请先关闭其他菜单后重试。');
+    const caret = article.querySelector('[data-testid="caret"]');
+    if (!caret) throw new Error('找不到推文菜单，请使用 X 菜单手动屏蔽。');
+    const waitFor = async get => {
+      for (let i=0;i<25;i++) {
+        if (!host.isConnected || !article.isConnected || read(article)?.fingerprint !== tweet.fingerprint) throw new Error('操作已取消。');
+        const found=get(); if(found) return found;
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+      throw new Error('找不到屏蔽选项，请使用 X 菜单手动屏蔽。');
+    };
+    caret.click();
+    const item = await waitFor(()=>[...document.querySelectorAll('[role="menuitem"]')].find(el=>{
+      const text=el.textContent.trim();
+      return /^(Block\s|屏蔽\s*|封鎖\s*|封锁\s*)/i.test(text) && text.toLowerCase().includes('@'+tweet.handle.toLowerCase());
+    }));
+    item.click();
+    await waitFor(()=>document.querySelector('[data-testid="confirmationSheetConfirm"]'));
+    closePrompt(); // User alone confirms in X's native dialog.
+  }
+  function maybePrompt(article, tweet, result, config) {
+    const handle=tweet.handle.toLowerCase();
+    if (!canPrompt(config,result,promptedAccounts.has(handle),!!activePrompt,Date.now(),lastPromptAt)
+      || document.hidden || !article.isConnected || !visible(article) || read(article)?.fingerprint !== tweet.fingerprint) return;
+    const host=document.createElement('div');
+    const root=host.attachShadow({mode:'closed'});
+    root.innerHTML='<style>:host{all:initial;position:fixed;right:18px;bottom:18px;z-index:2147483646;color:#edf2f7;font:14px/1.6 system-ui,sans-serif}.box{box-sizing:border-box;width:min(340px,calc(100vw - 36px));padding:18px;border:1px solid #435149;border-radius:12px;background:#17212b;box-shadow:0 10px 40px #0005}strong{color:#c6f586}p{margin:9px 0}.note{color:#aab4bf;font-size:12px}button{border:0;border-radius:7px;padding:9px 12px;margin-right:6px;background:#c6f586;color:#17212b;cursor:pointer;font-weight:600}.dismiss{background:#303b46;color:white}.status{color:#ffad99}</style><section class="box" role="dialog" aria-label="X Lens 屏蔽提示"><strong>X Lens · slop</strong><p class="message"></p><p class="note">模型可能误判。点击后仍需在 X 的确认窗口完成屏蔽。可在插件设置中关闭自动提示。</p><button class="block">屏蔽账号…</button><button class="dismiss">暂不屏蔽</button><p class="status" role="status"></p></section>';
+    root.querySelector('.message').textContent='@'+tweet.handle+' 的当前内容疑似 slop（'+Math.round(result.junk*100)+'%）。是否屏蔽这个账号？';
+    root.querySelector('.dismiss').onclick=closePrompt;
+    root.querySelector('.block').onclick=async()=>{
+      root.querySelector('.block').disabled=true;
+      try { await openBlockConfirmation(article,tweet,host); }
+      catch(error) { root.querySelector('.status').textContent=error.message; root.querySelector('.block').disabled=false; }
+    };
+    host.addEventListener('keydown',event=>{if(event.key==='Escape')closePrompt();});
+    document.body.append(host);activePrompt=host;promptedAccounts.add(handle);lastPromptAt=Date.now();
+  }
+
+
   function placeBadge(article, badge) {
     const controls = [...article.querySelectorAll('button, [role="button"]')];
     const grok = controls.find(el =>
@@ -63,6 +111,7 @@
       const config = await chrome.runtime.sendMessage({type:'config'});
       if (epoch !== generation) return;
       if (config?.error) throw new Error(config.error);
+      if (!config?.enabled || !config?.autoBlockPrompt) closePrompt();
       if (!config?.configured || !config.enabled) {
         report(!config?.configured ? '请填写 API Key 并保存' : '已暂停，请在设置中启用自动检测');
         return;
@@ -83,6 +132,7 @@
         readable++;
         if (state?.result?.flagged) {
           mark(article, tweet, state.result);
+          maybePrompt(article, tweet, state.result, config);
           continue;
         }
         if (state && Date.now() < state.retryAt) continue;
@@ -94,7 +144,7 @@
         if (result.error || result.skip) { report(result.error || result.reason); break; }
         checked++; if (result.flagged) hits++; if (result.isAI) aiHits++; if (result.isSlop) slopHits++; if (result.isAd) adHits++;
         report('已检查推文/评论 ' + checked + ' 条 · AI ' + aiHits + ' / slop ' + slopHits + ' / 广告 ' + adHits + ' · 最近 AI ' + Math.round(result.ai*100) + '% / 垃圾 ' + Math.round(result.junk*100) + '%');
-        if (result?.flagged) { mark(article, tweet, result); }
+        if (result?.flagged) { mark(article, tweet, result); maybePrompt(article, tweet, result, config); }
       }
       if (articles.length && !readable) {
         if (visibleTextCards) report('发现文字，但未能识别推文链接；请刷新页面后重试');
@@ -107,9 +157,10 @@
   chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (message.type !== 'reset') return;
     checked = 0; hits = 0; aiHits = 0; slopHits = 0; adHits = 0; report('设置已更新，准备检测…');
-    generation++; states = new WeakMap();
+    generation++; states = new WeakMap(); closePrompt();
     document.querySelectorAll('.slope-badge').forEach(el => el.remove());
     document.querySelectorAll('.slope-marked').forEach(el => el.classList.remove('slope-marked'));
+    reply({ok:true});
     scan();
   });
   window.addEventListener('resize', () => {
