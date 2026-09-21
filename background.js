@@ -24,7 +24,16 @@ async function classify(text) {
   }
   await chrome.storage.local.remove('lastError');
   const threshold = Number.isFinite(labelThreshold) && labelThreshold >= 0.5 && labelThreshold <= 0.99 ? labelThreshold : 0.65;
-  return {...scores, isAI: scores.ai >= threshold, isSlop: scores.junk >= threshold, isAd: scores.ad >= threshold, flagged: flagged(scores, threshold)};
+  const result = {
+    ...scores,
+    isAI: scores.ai >= threshold,
+    isSlop: scores.junk >= threshold,
+    isAd: scores.ad >= threshold,
+    isMarketing: scores.marketing >= threshold,
+    isSoftAd: scores.softAd >= threshold,
+    flagged: flagged(scores, threshold),
+  };
+  return {...result, isNormal: !result.flagged};
 }
 function enqueueClassification(text) {
   const job = tail.then(() => classify(text));

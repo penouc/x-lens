@@ -2,7 +2,7 @@
   let states = new WeakMap(), generation = 0, running = false;
   let activePrompt = null, lastPromptAt = -Infinity;
   const promptedAccounts = new Set();
-  let checked = 0, hits = 0, aiHits = 0, slopHits = 0, adHits = 0;
+  let checked = 0, hits = 0, aiHits = 0, slopHits = 0, adHits = 0, marketingHits = 0, softAdHits = 0, normalHits = 0;
   const monitor = document.createElement('div');
   monitor.className = 'slope-monitor'; monitor.setAttribute('role', 'status');
   document.body.append(monitor);
@@ -93,11 +93,18 @@
     const existing = article.querySelector('.slope-badge');
     if (existing) { placeBadge(article, existing); return; }
     const badge = document.createElement('button'); badge.className = 'slope-badge'; badge.type = 'button';
-    for (const [show, text, className] of [[result.isAI, 'AI', 'slop-ai'], [result.isSlop, 'slop / 垃圾', 'slop-junk'], [result.isAd, 'Ad / 广告', 'slop-ad']]) {
+    for (const [show, text, className] of [
+      [result.isAI, 'AI', 'slop-ai'],
+      [result.isSlop, 'slop / 垃圾', 'slop-junk'],
+      [result.isAd, 'Ad / 广告', 'slop-ad'],
+      [result.isMarketing, 'Marketing / 营销', 'slop-marketing'],
+      [result.isSoftAd, 'Soft Ad / 软广', 'slop-soft-ad'],
+      [result.isNormal, 'Normal / 正常', 'slop-normal'],
+    ]) {
       if (!show) continue;
       const label = document.createElement('span'); label.className = className; label.textContent = text; badge.append(label);
     }
-    badge.title = '疑似 AI ' + Math.round(result.ai*100) + '% · 垃圾内容 ' + Math.round(result.junk*100) + '% · 广告/软广 ' + Math.round(result.ad*100) + '%；点击查看评分';
+    badge.title = '疑似 AI ' + Math.round(result.ai*100) + '% · 垃圾 ' + Math.round(result.junk*100) + '% · 广告 ' + Math.round(result.ad*100) + '% · 营销 ' + Math.round(result.marketing*100) + '% · 软广 ' + Math.round(result.softAd*100) + '%；点击查看评分';
     badge.setAttribute('aria-label', badge.textContent + '，' + badge.title);
     badge.onclick = event => { event.preventDefault(); event.stopPropagation(); report(badge.title.replace('；点击查看评分', '')); };
     article.classList.add('slope-marked'); article.append(badge);
@@ -130,7 +137,7 @@
         if (state?.fingerprint !== tweet.fingerprint) { article.querySelector('.slope-badge')?.remove(); article.classList.remove('slope-marked'); state = null; }
         if (!visible(article)) continue;
         readable++;
-        if (state?.result?.flagged) {
+        if (state?.result && !state.result.error && !state.result.skip) {
           mark(article, tweet, state.result);
           maybePrompt(article, tweet, state.result, config);
           continue;
@@ -142,9 +149,9 @@
         if (!result) throw new Error('后台未返回结果，请重新加载插件并刷新页面');
         states.set(article, {fingerprint:tweet.fingerprint, result, retryAt:result?.error || result?.skip ? Date.now()+60000 : Infinity});
         if (result.error || result.skip) { report(result.error || result.reason); break; }
-        checked++; if (result.flagged) hits++; if (result.isAI) aiHits++; if (result.isSlop) slopHits++; if (result.isAd) adHits++;
-        report('已检查推文/评论 ' + checked + ' 条 · AI ' + aiHits + ' / slop·垃圾 ' + slopHits + ' / Ad·广告 ' + adHits + ' · 最近 AI ' + Math.round(result.ai*100) + '% / 垃圾 ' + Math.round(result.junk*100) + '%');
-        if (result?.flagged) { mark(article, tweet, result); maybePrompt(article, tweet, result, config); }
+        checked++; if (result.flagged) hits++; if (result.isAI) aiHits++; if (result.isSlop) slopHits++; if (result.isAd) adHits++; if (result.isMarketing) marketingHits++; if (result.isSoftAd) softAdHits++; if (result.isNormal) normalHits++;
+        report('已检查 ' + checked + ' 条 · AI ' + aiHits + ' / 垃圾 ' + slopHits + ' / 广告 ' + adHits + ' / 营销 ' + marketingHits + ' / 软广 ' + softAdHits + ' / 正常 ' + normalHits);
+        mark(article, tweet, result); maybePrompt(article, tweet, result, config);
       }
       if (articles.length && !readable) {
         if (visibleTextCards) report('发现文字，但未能识别推文链接；请刷新页面后重试');
@@ -156,7 +163,7 @@
   }
   chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (message.type !== 'reset') return;
-    checked = 0; hits = 0; aiHits = 0; slopHits = 0; adHits = 0; report('设置已更新，准备检测…');
+    checked = 0; hits = 0; aiHits = 0; slopHits = 0; adHits = 0; marketingHits = 0; softAdHits = 0; normalHits = 0; report('设置已更新，准备检测…');
     generation++; states = new WeakMap(); closePrompt();
     document.querySelectorAll('.slope-badge').forEach(el => el.remove());
     document.querySelectorAll('.slope-marked').forEach(el => el.classList.remove('slope-marked'));

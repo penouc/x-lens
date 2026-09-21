@@ -7,6 +7,9 @@ const source = readFileSync(new URL('../content.js', import.meta.url), 'utf8');
 test('visible category labels are bilingual', () => {
   assert.match(source, /'slop \/ 垃圾'/);
   assert.match(source, /'Ad \/ 广告'/);
+  assert.match(source, /'Marketing \/ 营销'/);
+  assert.match(source, /'Soft Ad \/ 软广'/);
+  assert.match(source, /'Normal \/ 正常'/);
   assert.match(source, /'AI'/);
 });
 

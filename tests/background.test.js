@@ -30,7 +30,7 @@ test('configuration status never exposes saved key',async()=>{
   assert.equal(JSON.stringify(result).includes('secret'),false);
 });
 test('connection test validates real response shape',async()=>{
-  const send=harness({apiKey:'dummy'},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.2},junk:{noul:.1},ad:{noul:.1}}})}));
+  const send=harness({apiKey:'dummy'},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.2},junk:{noul:.1},ad:{noul:.1},marketing:{noul:.1},soft_ad:{noul:.1}}})}));
   const result=await send({type:'testConnection'},{url:'chrome-extension://test/settings.html'});
   assert.equal(result.ok,true);
 });
@@ -42,24 +42,24 @@ test('connection test returns HTTP failure to UI',async()=>{
 
 
 test('new default ignores legacy 85 percent and returns AI-only label',async()=>{
-  const send=harness({apiKey:'dummy',enabled:true,threshold:.85},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.7},junk:{noul:.2},ad:{noul:.1}}})}));
+  const send=harness({apiKey:'dummy',enabled:true,threshold:.85},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.7},junk:{noul:.2},ad:{noul:.1},marketing:{noul:.1},soft_ad:{noul:.1}}})}));
   const result=await send({type:'classify',text:'a reply'});
   assert.equal(result.isAI,true); assert.equal(result.isSlop,false); assert.equal(result.flagged,true);
 });
 test('human spam gets slop independently of AI',async()=>{
-  const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.75},ad:{noul:.1}}})}));
+  const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.75},ad:{noul:.1},marketing:{noul:.1},soft_ad:{noul:.1}}})}));
   const result=await send({type:'classify',text:'another reply'});
   assert.equal(result.isAI,false); assert.equal(result.isSlop,true);
 });
 test('saved new threshold is respected',async()=>{
-  const send=harness({apiKey:'dummy',enabled:true,labelThreshold:.9},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.7},junk:{noul:.75},ad:{noul:.1}}})}));
+  const send=harness({apiKey:'dummy',enabled:true,labelThreshold:.9},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.7},junk:{noul:.75},ad:{noul:.1},marketing:{noul:.1},soft_ad:{noul:.1}}})}));
   const result=await send({type:'classify',text:'a post'});
   assert.equal(result.isAI,false); assert.equal(result.isSlop,false); assert.equal(result.flagged,false);
 });
 
 
 test('advertising alone receives a label without AI or slop',async()=>{
-  const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.2},ad:{noul:.9}}})}));
+  const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.2},ad:{noul:.9},marketing:{noul:.1},soft_ad:{noul:.1}}})}));
   const result=await send({type:'classify',text:'Try our product with a discount'});
   assert.equal(result.isAd,true);assert.equal(result.isAI,false);assert.equal(result.isSlop,false);assert.equal(result.flagged,true);
 });
@@ -67,4 +67,19 @@ test('missing advertising score fails safely instead of treating it as zero',asy
   const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.2}}})}));
   const result=await send({type:'classify',text:'text'});
   assert.match(result.error,/评分/);assert.equal(result.flagged,undefined);
+});
+
+test('marketing and soft ads are independent categories',async()=>{
+  const marketingSend=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.1},ad:{noul:.1},marketing:{noul:.8},soft_ad:{noul:.1}}})}));
+  const marketing=await marketingSend({type:'classify',text:'Brand campaign'});
+  assert.equal(marketing.isMarketing,true);assert.equal(marketing.isSoftAd,false);assert.equal(marketing.isNormal,false);
+  const softAdSend=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.1},ad:{noul:.1},marketing:{noul:.1},soft_ad:{noul:.8}}})}));
+  const softAd=await softAdSend({type:'classify',text:'Personal recommendation with subtle promotion'});
+  assert.equal(softAd.isMarketing,false);assert.equal(softAd.isSoftAd,true);assert.equal(softAd.isNormal,false);
+});
+
+test('nothing over the threshold is labeled normal',async()=>{
+  const send=harness({apiKey:'dummy',enabled:true},async()=>({ok:true,json:async()=>({answers:{ai:{noul:.1},junk:{noul:.2},ad:{noul:.1},marketing:{noul:.2},soft_ad:{noul:.1}}})}));
+  const result=await send({type:'classify',text:'I went for a walk today.'});
+  assert.equal(result.flagged,false);assert.equal(result.isNormal,true);
 });
