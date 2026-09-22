@@ -1,12 +1,17 @@
 (() => {
-  let states = new WeakMap(), generation = 0, running = false;
+  let states = new WeakMap(), generation = 0, running = false, scanTimer = null, configCache = null;
   let activePrompt = null, lastPromptAt = -Infinity;
   const promptedAccounts = new Set();
   let checked = 0, hits = 0, aiHits = 0, slopHits = 0, adHits = 0, marketingHits = 0, softAdHits = 0, normalHits = 0;
   const monitor = document.createElement('div');
   monitor.className = 'slope-monitor'; monitor.setAttribute('role', 'status');
   document.body.append(monitor);
-  function report(text) { monitor.textContent = 'X Lens · ' + text; }
+  let lastReport = '';
+  function report(text) {
+    const next = 'X Lens · ' + text;
+    if (next === lastReport) return;
+    lastReport = next; monitor.textContent = next;
+  }
   report('正在连接插件…');
   function isOwnContent(node, article) {
     if (node.closest('article') !== article) return false;
@@ -91,7 +96,7 @@
   }
   function mark(article, tweet, result) {
     const existing = article.querySelector('.slope-badge');
-    if (existing) { placeBadge(article, existing); return; }
+    if (existing) return;
     const badge = document.createElement('button'); badge.className = 'slope-badge'; badge.type = 'button';
     for (const [show, text, className] of [
       [result.isAI, 'AI', 'slop-ai'],
@@ -115,7 +120,8 @@
     running = true;
     const epoch = generation;
     try {
-      const config = await chrome.runtime.sendMessage({type:'config'});
+      const config = configCache || await chrome.runtime.sendMessage({type:'config'});
+      if (!config?.error) configCache = config;
       if (epoch !== generation) return;
       if (config?.error) throw new Error(config.error);
       if (!config?.enabled || !config?.autoBlockPrompt) closePrompt();
@@ -125,17 +131,15 @@
       }
       const articles = document.querySelectorAll('article[data-testid="tweet"]');
       if (!articles.length) report('已启用，等待推文加载…');
-      let readable = 0, visibleCards = 0, visibleTextCards = 0;
+      let readable = 0, visibleCards = 0, visibleTextCards = 0, newClassifications = 0;
       for (const article of articles) {
         if (epoch !== generation) break;
-        if (visible(article)) {
-          visibleCards++;
-          if (article.querySelector('[data-testid="tweetText"]')) visibleTextCards++;
-        }
+        if (!visible(article)) continue;
+        visibleCards++;
+        if (article.querySelector('[data-testid="tweetText"]')) visibleTextCards++;
         const tweet = read(article); if (!tweet) continue;
         let state = states.get(article);
         if (state?.fingerprint !== tweet.fingerprint) { article.querySelector('.slope-badge')?.remove(); article.classList.remove('slope-marked'); state = null; }
-        if (!visible(article)) continue;
         readable++;
         if (state?.result && !state.result.error && !state.result.skip) {
           mark(article, tweet, state.result);
@@ -143,6 +147,8 @@
           continue;
         }
         if (state && Date.now() < state.retryAt) continue;
+        if (newClassifications >= 3) continue;
+        newClassifications++;
         report('正在检测… 已检查 ' + checked + ' 条 / 标记 ' + hits + ' 条');
         const result = await chrome.runtime.sendMessage({type:'classify', text:tweet.text});
         if (epoch !== generation || !article.isConnected || read(article)?.fingerprint !== tweet.fingerprint) continue;
@@ -159,23 +165,33 @@
         else report('等待推文进入可见区域…');
       }
     } catch(error) { report(/context invalidated/i.test(error.message) ? '插件已更新，请刷新此页面' : '连接异常：' + error.message); }
-    finally { running = false; }
+    finally { running = false; scheduleScan(); }
   }
   chrome.runtime.onMessage.addListener((message, sender, reply) => {
     if (message.type !== 'reset') return;
     checked = 0; hits = 0; aiHits = 0; slopHits = 0; adHits = 0; marketingHits = 0; softAdHits = 0; normalHits = 0; report('设置已更新，准备检测…');
-    generation++; states = new WeakMap(); closePrompt();
+    generation++; states = new WeakMap(); configCache = null; closePrompt();
     document.querySelectorAll('.slope-badge').forEach(el => el.remove());
     document.querySelectorAll('.slope-marked').forEach(el => el.classList.remove('slope-marked'));
     reply({ok:true});
     scan();
   });
+  function scheduleScan(delay = 3500) {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(scan, delay);
+  }
+  let resizeFrame = 0;
   window.addEventListener('resize', () => {
-    document.querySelectorAll('article.slope-marked').forEach(article => {
-      const badge = article.querySelector('.slope-badge');
-      if (badge) placeBadge(article, badge);
+    if (resizeFrame) return;
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0;
+      document.querySelectorAll('article.slope-marked').forEach(article => {
+        const badge = article.querySelector('.slope-badge');
+        if (badge) placeBadge(article, badge);
+      });
     });
   });
-  setInterval(scan, 1500);
-  scan();
+  window.addEventListener('scroll', () => scheduleScan(400), {passive:true});
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleScan(100); });
+  scheduleScan(0);
 })();
